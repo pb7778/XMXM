@@ -2,48 +2,67 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>AB PLC 强力去锁 V2.0 (修正版)</title>
+    <title>AB PLC 密钥提取与解锁工具2 (V3 终极版)</title>
     <style>
-        body { font-family: "Microsoft YaHei", sans-serif; background-color: #1e1e1e; color: #d4d4d4; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding-top: 40px; }
-        .container { background: #252526; padding: 30px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 550px; border: 1px solid #3e3e42; }
-        h2 { color: #4ec9b0; margin-top: 0; text-align: center; border-bottom: 1px solid #3e3e42; padding-bottom: 15px; }
+        body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { background: #1e1e1e; padding: 30px; border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.7); width: 650px; border: 1px solid #333; max-width: 95%; }
+        h2 { color: #00e676; margin-top: 0; text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; letter-spacing: 1px; }
         
         .drop-area { 
-            border: 2px dashed #555; background: #2d2d30; padding: 40px; margin: 20px 0; 
-            border-radius: 6px; cursor: pointer; text-align: center; transition: 0.2s; color: #858585; 
+            border: 2px dashed #444; background: #252526; padding: 40px; margin: 20px 0; 
+            border-radius: 8px; cursor: pointer; text-align: center; transition: 0.2s; color: #888; font-size: 16px;
         }
-        .drop-area:hover { border-color: #4ec9b0; color: #fff; background: #333; }
-        
-        /* 黑色诊断日志框 */
+        .drop-area:hover { border-color: #00e676; color: #fff; background: #2d2d30; }
+        .drop-area.highlight { border-color: #00e676; background: #2a2a2a; }
+
+        /* 密钥显示区 - 满足您看密码的需求 */
+        .key-display {
+            background: #2d2b55; border: 1px solid #7d57ff; color: #d6deeb; padding: 15px;
+            border-radius: 5px; margin-bottom: 15px; display: none; word-break: break-all;
+            font-family: Consolas, monospace; font-size: 13px; text-align: left;
+        }
+        .key-label { color: #c792ea; font-weight: bold; display: block; margin-bottom: 8px; border-bottom: 1px solid #7d57ff; padding-bottom: 5px; }
+
+        /* 日志框 */
         .log-window { 
-            background: #000; color: #00ff00; font-family: Consolas, monospace; font-size: 12px; 
-            padding: 10px; border-radius: 4px; height: 120px; overflow-y: auto; 
-            margin-bottom: 15px; border: 1px solid #444; white-space: pre-wrap; word-break: break-all;
+            background: #000; color: #ccc; font-family: Consolas, monospace; font-size: 12px; 
+            padding: 15px; border-radius: 4px; height: 120px; overflow-y: auto; 
+            margin-bottom: 20px; border: 1px solid #333; white-space: pre-wrap; text-align: left;
         }
-        
+
         .btn { 
-            background: #0e639c; color: white; border: none; padding: 12px 30px; 
-            font-size: 16px; cursor: pointer; border-radius: 4px; display: none; width: 100%; 
+            background: linear-gradient(135deg, #00c853 0%, #009624 100%); color: white; border: none; padding: 15px; 
+            font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 6px; display: none; width: 100%; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: transform 0.1s;
         }
-        .btn:hover { background: #1177bb; }
-        .footer { font-size: 12px; color: #666; margin-top: 10px; text-align: center; }
+        .btn:active { transform: scale(0.98); }
+        .footer { font-size: 12px; color: #666; margin-top: 20px; text-align: center; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🔓 AB PLC 强力去锁 (V2.0)</h2>
+    <h2>🔐 AB PLC 智能密钥提取/解锁 V3</h2>
     
     <div class="drop-area" id="dropZone">
-        👉 拖入 .L5X 文件到这里 <br>
-        <span style="font-size:12px; color:#666">(支持 单引号/双引号/L5K 格式)</span>
+        📂 点击选择或拖入 .L5X 文件<br>
+        <span style="font-size:12px; color:#aaa; margin-top:5px; display:block">(内置智能编码识别，支持 UTF-8 / UTF-16)</span>
     </div>
     <input type="file" id="fileInput" accept=".L5X,.l5x,.L5K,.l5k" style="display:none">
     
-    <div class="log-window" id="logBox">等待文件导入...</div>
+    <div id="keyOutput" class="key-display">
+        <span class="key-label">🔍 提取到的原始密钥 (Encrypted Hash):</span>
+        <span id="keyText" style="color:#addb67;"></span>
+    </div>
+
+    <div class="log-window" id="logBox">系统就绪...</div>
     
-    <button id="dlBtn" class="btn">⬇️ 下载无锁版文件</button>
-    <div class="footer">遇到问题？请截图上方黑框内容</div>
+    <button id="dlBtn" class="btn">⬇️ 下载已解锁文件 (导入即可打开)</button>
+    
+    <div class="footer">
+        原理说明：此工具会自动识别文件编码，提取加密哈希并直接移除 "SourceKey" 属性。<br>
+        下载后的文件实际上已变为“无密码”状态，直接导入 Studio 5000 即可。
+    </div>
 </div>
 
 <script>
@@ -51,86 +70,122 @@
     const fileInput = document.getElementById('fileInput');
     const logBox = document.getElementById('logBox');
     const dlBtn = document.getElementById('dlBtn');
+    const keyOutput = document.getElementById('keyOutput');
+    const keyText = document.getElementById('keyText');
+    
     let processedContent = null, originalName = "";
 
-    // 辅助日志函数
-    function log(msg, color = '#00ff00') {
-        logBox.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
+    function log(msg, color = '#ccc') {
+        const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
+        logBox.innerHTML += `<div style="color:${color}">[${time}] ${msg}</div>`;
         logBox.scrollTop = logBox.scrollHeight;
     }
 
-    // 绑定交互事件
+    // 交互逻辑
     dropZone.onclick = () => fileInput.click();
-    fileInput.onchange = (e) => processFile(e.target.files[0]);
-    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = '#4ec9b0'; };
-    dropZone.ondragleave = (e) => { e.preventDefault(); dropZone.style.borderColor = '#555'; };
-    dropZone.ondrop = (e) => { e.preventDefault(); dropZone.style.borderColor = '#555'; processFile(e.dataTransfer.files[0]); };
+    fileInput.onchange = (e) => loadFile(e.target.files[0]);
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('highlight'); };
+    dropZone.ondragleave = (e) => { e.preventDefault(); dropZone.classList.remove('highlight'); };
+    dropZone.ondrop = (e) => { 
+        e.preventDefault(); 
+        dropZone.classList.remove('highlight'); 
+        loadFile(e.dataTransfer.files[0]); 
+    };
 
-    function processFile(file) {
+    function loadFile(file) {
         if (!file) return;
-        logBox.innerHTML = ""; // 清空日志
+        
+        // 重置状态
+        logBox.innerHTML = "";
         dlBtn.style.display = 'none';
+        keyOutput.style.display = 'none';
         originalName = file.name;
         
-        log(`正在读取: ${file.name} (${(file.size/1024).toFixed(2)} KB)...`);
-        
+        log(`正在加载: ${file.name} (${(file.size/1024).toFixed(2)} KB)...`, '#fff');
+
         const reader = new FileReader();
+        
+        // 【核心修复】使用 ArrayBuffer 读取，彻底解决 UTF-16 乱码导致无法识别的问题
+        reader.readAsArrayBuffer(file);
+        
         reader.onload = (e) => {
-            const content = e.target.result;
-            let foundCount = 0;
-
-            // --- V2.0 核心修正逻辑 ---
-            // 1. (SourceKey|...): 匹配旧版Key、新版Protection和Context
-            // 2. \s*[:]?=\s*: 匹配等号，允许前面有冒号(:= L5K格式)，允许两边有空格
-            // 3. (["']): 捕获引号类型（单引号或双引号）
-            // 4. [\s\S]*?: 匹配引号内的任意内容（兼容换行符）
-            // 5. \2: 必须匹配和开头相同的结束引号
-            const regex = /(SourceKey|SourceProtection|SourceContext)\s*[:]?=\s*(["'])[\s\S]*?\2/gi;
-
-            // 预检查：先看看文件里有没有这个词
-            if (content.indexOf("SourceKey") === -1 && content.indexOf("SourceProtection") === -1) {
-                log("⚠️ 警告：全文搜索未发现加密关键字！", '#ff4444');
-                log("可能原因：1.文件未加密 2.这是.ACD工程文件(请先导出L5X) 3.文件编码乱码", '#aaa');
-                return;
-            }
-
-            // 执行替换（删除锁）
-            const newContent = content.replace(regex, (match) => {
-                foundCount++;
-                if(foundCount <= 3) { // 只在日志显示前3个，防止刷屏
-                    log(`发现并移除: ${match.substring(0, 40)}...`, '#4ec9b0');
+            try {
+                const buffer = e.target.result;
+                let content = "";
+                
+                // 1. 智能检测编码
+                const uint8Array = new Uint8Array(buffer);
+                let encoding = "utf-8";
+                
+                // 检测 BOM 或 Null 字节模式
+                if (uint8Array[0] === 0xFF && uint8Array[1] === 0xFE) {
+                    encoding = "utf-16le";
+                    log("检测到编码: UTF-16 LE (带BOM)", '#e6db74');
+                } else {
+                    // 扫描前1000字节，如果包含大量0，说明是无BOM的UTF-16
+                    let nullCount = 0;
+                    for(let i=0; i<Math.min(1000, uint8Array.length); i++) {
+                        if(uint8Array[i] === 0) nullCount++;
+                    }
+                    if(nullCount > 200) {
+                        encoding = "utf-16le";
+                        log("检测到编码: UTF-16 LE (无BOM)", '#e6db74');
+                    } else {
+                        log("检测到编码: UTF-8 / ASCII", '#e6db74');
+                    }
                 }
-                return ""; // 替换为空字符串
-            });
 
-            if (foundCount > 0) {
-                processedContent = newContent;
-                log("----------------------");
-                log(`✅ 成功！共移除 ${foundCount} 处加密锁属性。`);
-                log(`文件已修复，点击下方按钮下载。`, '#fff');
-                dlBtn.style.display = 'block';
-                // 自动生成新文件名
-                let ext = originalName.substring(originalName.lastIndexOf('.'));
-                let nameNoExt = originalName.substring(0, originalName.lastIndexOf('.'));
-                dlBtn.innerText = `⬇️ 下载无锁版 (${nameNoExt}_Unlocked${ext})`;
-            } else {
-                log("❌ 错误：发现了关键字，但正则匹配失败。", '#ff4444');
-                log("这意味着您的文件格式非常特殊。建议用记事本打开，搜索 'SourceKey' 手动删除。", '#aaa');
+                // 2. 解码文本
+                const decoder = new TextDecoder(encoding);
+                content = decoder.decode(buffer);
+                
+                // 3. 正则匹配加密锁 (兼容旧版 SourceKey 和 新版 SourceProtection)
+                const regex = /(SourceKey|SourceProtection|SourceContext)\s*=\s*(["'])([\s\S]*?)\2/gi;
+                
+                let match = regex.exec(content);
+                
+                if (match) {
+                    const lockType = match[1]; // Key 或 Protection
+                    const lockHash = match[3]; // 引号里的内容
+                    
+                    log(`✅ 成功定位加密信息！类型: ${lockType}`, '#00e676');
+                    
+                    // 显示提取到的 Key（这就是那个网站读取的原始数据）
+                    keyOutput.style.display = 'block';
+                    keyText.textContent = lockHash.substring(0, 150) + (lockHash.length > 150 ? "..." : "");
+                    
+                    if(lockHash.length > 50) {
+                        log("提示: 检测到长哈希，已准备暴力移除。", '#888');
+                    }
+
+                    // 4. 执行移除操作
+                    // 使用 replace 全部替换为空
+                    processedContent = content.replace(regex, "");
+                    
+                    dlBtn.style.display = 'block';
+                    log("🔓 文件已解锁！点击下方绿色按钮下载。", '#fff');
+                } else {
+                    log("❌ 未发现加密关键字。", '#ff5252');
+                    log("诊断: 文件解码正常，但未找到 SourceKey 属性。", '#888');
+                    log("可能原因: 导出的是整个工程而非 Routine？请确认您是右键Routine导出的L5X。", '#888');
+                }
+
+            } catch (err) {
+                log("程序错误: " + err.message, '#ff5252');
             }
         };
-        
-        // 使用 Text 方式读取，防止编码问题
-        reader.readAsText(file, 'utf-8');
     }
 
     dlBtn.onclick = () => {
-        const blob = new Blob([processedContent], { type: 'text/plain' });
+        // 输出时统一转换为 UTF-8，兼容性最好
+        const blob = new Blob([processedContent], { type: 'text/xml;charset=utf-8' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        // 自动匹配下载文件名
-        let ext = originalName.substring(originalName.lastIndexOf('.'));
-        let nameNoExt = originalName.substring(0, originalName.lastIndexOf('.'));
-        link.download = nameNoExt + '_Unlocked' + ext;
+        
+        let namePart = originalName.substring(0, originalName.lastIndexOf('.'));
+        // 保持原扩展名
+        let ext = originalName.substring(originalName.lastIndexOf('.')); 
+        link.download = namePart + '_Unlocked' + ext;
         
         document.body.appendChild(link);
         link.click();
