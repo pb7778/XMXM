@@ -2,176 +2,215 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>AB PLC L5X 可视化诊断与去锁 (V5.0)</title>
+    <title>AB PLC L5X 深度解锁 (V6 XML内核)</title>
     <style>
-        body { font-family: "Consolas", "Monaco", monospace; background: #1e1e1e; color: #d4d4d4; margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        body { font-family: "Segoe UI", sans-serif; background-color: #1e1e1e; color: #ccc; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .container { background: #252526; width: 850px; max-width: 95%; padding: 30px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h2 { color: #4ec9b0; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 15px; }
         
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #333; }
-        .title { font-size: 20px; color: #4ec9b0; font-weight: bold; }
+        .upload-box { 
+            border: 2px dashed #444; padding: 30px; text-align: center; cursor: pointer; 
+            border-radius: 6px; transition: 0.2s; background: #2d2d30; margin-bottom: 20px;
+        }
+        .upload-box:hover { border-color: #4ec9b0; background: #333; color: white; }
+
+        /* 结果列表表格 */
+        .result-table { width: 100%; border-collapse: collapse; margin-top: 15px; display: none; table-layout: fixed; }
+        .result-table th { text-align: left; border-bottom: 1px solid #555; padding: 10px; color: #4ec9b0; font-size: 14px; }
+        .result-table td { border-bottom: 1px solid #333; padding: 10px; font-family: Consolas, monospace; font-size: 12px; word-break: break-all; vertical-align: top;}
         
-        .controls { display: flex; gap: 10px; }
-        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
-        .btn-blue { background: #007acc; color: white; }
-        .btn-yellow { background: #dcdcaa; color: #1e1e1e; }
-        .btn-green { background: #4CAF50; color: white; display: none; } /* 默认隐藏 */
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .col-tag { width: 10%; color: #569cd6; font-weight: bold; }
+        .col-name { width: 25%; color: #dcdcaa; }
+        .col-type { width: 15%; color: #9cdcfe; }
+        .col-hash { width: 50%; color: #ce9178; }
 
-        /* 编辑区域 */
-        #editor { 
-            flex: 1; background: #252526; color: #d4d4d4; border: 1px solid #3e3e42; 
-            padding: 15px; font-size: 13px; line-height: 1.5; resize: none; outline: none; white-space: pre; overflow: auto;
-            font-family: "Consolas", monospace;
-        }
+        .btn-row { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .btn-green { background: #388e3c; color: white; display: none; }
+        .btn-green:hover { background: #2e7d32; }
+        .btn-yellow { background: #fbc02d; color: #111; }
 
-        /* 密码展示区 */
-        #keyPanel {
-            background: #2d2b55; color: #fad000; padding: 10px; margin-bottom: 10px; 
-            border-radius: 4px; display: none; word-break: break-all; font-size: 12px; border: 1px solid #555;
-        }
-
-        .status-bar { margin-top: 10px; font-size: 13px; color: #aaa; display: flex; justify-content: space-between; background: #333; padding: 5px 10px; border-radius: 4px; }
+        .log { margin-top: 15px; font-size: 12px; color: #888; white-space: pre-wrap; height: 100px; overflow-y: auto; background: #111; padding: 10px; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <div class="title">🔓 AB PLC 源码可视化诊疗</div>
-    <div class="controls">
-        <button class="btn btn-blue" onclick="document.getElementById('fileInput').click()">1. 打开文件</button>
-        <button class="btn btn-yellow" onclick="toggleEncoding()">2. 乱码点我 (切换编码)</button>
-        <button class="btn btn-green" id="downloadBtn" onclick="saveFile()">3. 下载无锁文件</button>
+<div class="container">
+    <h2>🔓 AB PLC L5X 深度解锁 (V6 XML内核)</h2>
+    <p style="font-size:13px; color:#aaa;">此版本使用 XML DOM 解析器遍历节点，专门解决“找不到关键字”或“漏掉多个密码”的问题。</p>
+
+    <div class="upload-box" id="dropArea" onclick="document.getElementById('fileInput').click()">
+        📂 点击此处上传 .L5X 文件
     </div>
-    <input type="file" id="fileInput" accept=".L5X,.l5x,.L5K,.l5k" style="display:none">
-</div>
+    <input type="file" id="fileInput" accept=".L5X,.l5x" style="display:none">
 
-<div id="keyPanel">
-    <strong>🔑 提取到的原始密钥 (Encrypted Hash):</strong><br>
-    <span id="keyContent">...</span>
-</div>
+    <div id="statusMsg" style="color: #ccc; margin-bottom: 10px; font-weight: bold;">等待文件...</div>
 
-<textarea id="editor" placeholder="说明：&#10;1. 点击“打开文件”选择您的 L5X。&#10;2. 此时如果您看到全是方块或乱码，请务必点击上方黄色的“切换编码”按钮！&#10;3. 直到您能清晰看到 &lt;Routine Name=... 这种代码。&#10;4. 工具会自动识别并提取密码，随后点击绿色按钮下载。" spellcheck="false"></textarea>
+    <table class="result-table" id="lockTable">
+        <thead>
+            <tr>
+                <th class="col-tag">标签</th>
+                <th class="col-name">程序块名称 (Name)</th>
+                <th class="col-type">锁类型</th>
+                <th class="col-hash">原始加密数据 (Hash)</th>
+            </tr>
+        </thead>
+        <tbody id="lockList"></tbody>
+    </table>
 
-<div class="status-bar">
-    <div id="status">等待文件...</div>
-    <div id="info"></div>
+    <div class="btn-row">
+        <button class="btn btn-yellow" onclick="retryEncoding()">🔁 乱码？切换编码重试</button>
+        <button class="btn btn-green" id="dlBtn" onclick="downloadFile()">⬇️ 下载无锁版文件</button>
+    </div>
+
+    <div class="log" id="sysLog">系统日志...</div>
 </div>
 
 <script>
-    const editor = document.getElementById('editor');
-    const statusDiv = document.getElementById('status');
-    const infoDiv = document.getElementById('info');
-    const keyPanel = document.getElementById('keyPanel');
-    const keyContent = document.getElementById('keyContent');
-    const downloadBtn = document.getElementById('downloadBtn');
+    const fileInput = document.getElementById('fileInput');
+    const lockTable = document.getElementById('lockTable');
+    const lockList = document.getElementById('lockList');
+    const dlBtn = document.getElementById('dlBtn');
+    const sysLog = document.getElementById('sysLog');
+    const statusMsg = document.getElementById('statusMsg');
 
-    let currentFile = null;
-    let fileBuffer = null;
-    let isUTF16 = false; // 默认先试 UTF-8
+    let currentFileBuffer = null;
+    let currentFileName = "";
+    let isUTF16 = false;
+    let xmlDoc = null; // XML 对象
+
+    // 日志辅助
+    function log(msg) {
+        sysLog.innerText += `> ${msg}\n`;
+        sysLog.scrollTop = sysLog.scrollHeight;
+    }
 
     // 1. 读取文件
-    document.getElementById('fileInput').addEventListener('change', function(e) {
+    fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        currentFile = file;
+        currentFileName = file.name;
         
         const reader = new FileReader();
-        reader.readAsArrayBuffer(file);
+        reader.readAsArrayBuffer(file); // 关键：二进制读取，防止编码错误
         reader.onload = (e) => {
-            fileBuffer = e.target.result;
-            // 简单的智能预判：检查前1000字节里的0的数量
-            const u8 = new Uint8Array(fileBuffer);
-            let nullCount = 0;
-            for(let i=0; i<Math.min(1000, u8.length); i++) if(u8[i]===0) nullCount++;
-            
-            // 如果0很多，或者是BOM头，自动切到 UTF-16
-            if ((nullCount > 200) || (u8[0]===0xFF && u8[1]===0xFE)) {
+            currentFileBuffer = e.target.result;
+            // 自动检测编码
+            const u8 = new Uint8Array(currentFileBuffer);
+            if (u8[0] === 0xFF && u8[1] === 0xFE) {
                 isUTF16 = true;
+                log("检测到 BOM 头，自动设为 UTF-16 LE");
             } else {
-                isUTF16 = false;
+                // 简单统计0的个数来判断
+                let nulls = 0;
+                for(let i=0; i<Math.min(1000, u8.length); i++) if(u8[i]===0) nulls++;
+                isUTF16 = (nulls > 200);
+                log(`编码智能检测结果: ${isUTF16 ? 'UTF-16' : 'UTF-8'}`);
             }
-            renderText();
+            processXML();
         };
     });
 
-    // 2. 渲染文本 (核心：让用户能看到)
-    function renderText() {
-        if (!fileBuffer) return;
+    // 2. 切换编码重试
+    function retryEncoding() {
+        if(!currentFileBuffer) return alert("请先上传文件");
+        isUTF16 = !isUTF16;
+        log(`手动切换编码为: ${isUTF16 ? 'UTF-16' : 'UTF-8'}`);
+        processXML();
+    }
+
+    // 3. 核心：XML 解析与去锁
+    function processXML() {
+        sysLog.innerText = ""; // 清空日志
+        lockList.innerHTML = "";
+        lockTable.style.display = 'none';
+        dlBtn.style.display = 'none';
+
         try {
+            // 解码文本
             const decoder = new TextDecoder(isUTF16 ? 'utf-16le' : 'utf-8');
-            const text = decoder.decode(fileBuffer);
-            editor.value = text;
-            
-            statusDiv.innerHTML = `当前编码: <span style="color:${isUTF16?'#4CAF50':'#007acc'}">${isUTF16 ? 'UTF-16 LE' : 'UTF-8'}</span>`;
-            
-            // 每次渲染完立刻分析
-            analyzeAndUnlock(text);
-        } catch (e) {
-            editor.value = "解码错误，请点击“切换编码”重试。";
-        }
-    }
+            const textContent = decoder.decode(currentFileBuffer);
 
-    // 3. 切换编码按钮
-    function toggleEncoding() {
-        if (!fileBuffer) return;
-        isUTF16 = !isUTF16; // 切换状态
-        renderText();
-    }
+            // 解析 XML (不管格式多乱，只有 DOM 能读懂)
+            const parser = new DOMParser();
+            xmlDoc = parser.parseFromString(textContent, "text/xml");
 
-    // 4. 分析、提取密码、去锁
-    function analyzeAndUnlock(text) {
-        // 重置界面
-        keyPanel.style.display = 'none';
-        downloadBtn.style.display = 'none';
-        infoDiv.innerHTML = "";
-
-        // 匹配所有可能的锁类型 (包括 AOI 的 Signature)
-        const regex = /(SourceKey|SourceProtection|SourceContext|SignatureID|EncryptionSignature)\s*[:]?=\s*(["'])([\s\S]*?)\2/gi;
-        const match = regex.exec(text);
-        
-        if (match) {
-            const lockType = match[1];
-            const lockHash = match[3];
-
-            // 1. 显示密码
-            keyPanel.style.display = 'block';
-            keyContent.innerText = lockHash;
-            
-            // 2. 提示信息
-            infoDiv.innerHTML = `✅ 发现锁: <b>${lockType}</b> | 已自动移除，请下载`;
-            infoDiv.style.color = "#4CAF50";
-
-            // 3. 在编辑器里直接把锁删掉 (为了下载做准备)
-            const newText = text.replace(regex, "");
-            editor.value = newText; // 更新编辑器内容为无锁版
-            downloadBtn.style.display = 'block';
-
-        } else {
-            // 没找到锁，进行诊断
-            if (text.includes("<EncodedData>")) {
-                infoDiv.innerHTML = `❌ 警告: 发现 <b>&lt;EncodedData&gt;</b> (这是二进制编译保护，无法还原源码)`;
-                infoDiv.style.color = "#ff5252";
-            } else if (text.indexOf("Routine") === -1 && text.indexOf("<?xml") === -1) {
-                infoDiv.innerHTML = `⚠️ 文字看起来像乱码？请点击上方黄色的 <b>[切换编码]</b> 按钮！`;
-                infoDiv.style.color = "#dcdcaa";
-            } else {
-                infoDiv.innerHTML = `ℹ️ 文件格式正常，但未发现加密关键字。`;
+            // 检查解析错误
+            const parseError = xmlDoc.getElementsByTagName("parsererror");
+            if (parseError.length > 0) {
+                statusMsg.innerHTML = "❌ XML 解析失败，文件可能已损坏或编码错误（请点黄色按钮重试）。";
+                log("DOM 解析错误: " + parseError[0].textContent);
+                return;
             }
+
+            // 要查找的加密属性列表 (涵盖所有已知变体)
+            const lockAttributes = ["SourceKey", "SourceProtection", "SourceContext", "SignatureID", "EncryptionSignature"];
+            let foundCount = 0;
+
+            // 遍历所有元素 (深度扫描)
+            const allElements = xmlDoc.getElementsByTagName("*");
+            log(`正在深度扫描 ${allElements.length} 个节点...`);
+
+            for (let i = 0; i < allElements.length; i++) {
+                const el = allElements[i];
+                
+                // 检查当前元素是否有上述属性
+                lockAttributes.forEach(attr => {
+                    if (el.hasAttribute(attr)) {
+                        foundCount++;
+                        const hashVal = el.getAttribute(attr);
+                        const elName = el.getAttribute("Name") || "(未命名)";
+                        
+                        // 添加到显示列表
+                        const row = lockList.insertRow();
+                        row.innerHTML = `
+                            <td class="col-tag">&lt;${el.tagName}&gt;</td>
+                            <td class="col-name">${elName}</td>
+                            <td class="col-type">${attr}</td>
+                            <td class="col-hash">${hashVal.substring(0, 50)}...</td>
+                        `;
+
+                        // 核心操作：移除锁
+                        el.removeAttribute(attr);
+                        log(`[已移除] ${el.tagName} (${elName}) -> ${attr}`);
+                    }
+                });
+            }
+
+            if (foundCount > 0) {
+                statusMsg.innerHTML = `✅ 成功！共发现并移除了 <span style="color:#4ec9b0;font-size:18px;">${foundCount}</span> 处加密保护。`;
+                lockTable.style.display = 'table';
+                dlBtn.style.display = 'inline-block';
+            } else {
+                statusMsg.innerHTML = "⚠️ 未发现任何标准加密属性。";
+                log("提示：如果是 .L5K 文件，请在 Studio 5000 中另存为 .L5X。");
+                log("提示：如果看到乱码，请务必点击【切换编码重试】。");
+            }
+
+        } catch (err) {
+            log("处理出错: " + err.message);
         }
     }
 
-    // 5. 保存下载
-    function saveFile() {
-        if (!editor.value) return;
-        const blob = new Blob([editor.value], { type: 'text/plain;charset=utf-8' });
+    // 4. 下载文件
+    function downloadFile() {
+        if (!xmlDoc) return;
+        
+        // 序列化回字符串
+        const serializer = new XMLSerializer();
+        let newContent = serializer.serializeToString(xmlDoc);
+        
+        // XMLSerializer 有时会丢失 XML 声明，补一下
+        if (!newContent.startsWith("<?xml")) {
+            newContent = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + newContent;
+        }
+
+        const blob = new Blob([newContent], { type: 'text/xml;charset=utf-8' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         
-        // 智能文件名
-        let name = "Unlocked.L5X";
-        if (currentFile) {
-            name = currentFile.name.replace(/\.(l5x|L5X)/, "_Unlocked.L5X");
-        }
-        link.download = name;
+        let newName = currentFileName.replace(/\.(l5x|L5X)/, "_Unlocked.L5X");
+        link.download = newName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
