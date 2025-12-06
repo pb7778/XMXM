@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>AB PLC 本地解锁工具 (离线版)</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; background-color: #2d2d2d; color: #eee; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #3c3c3c; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; width: 450px; border: 1px solid #555; }
+        h2 { color: #4CAF50; margin-top: 0; }
+        .drop-area { border: 2px dashed #666; background: #333; padding: 40px; margin: 20px 0; border-radius: 8px; cursor: pointer; transition: 0.3s; color: #aaa; }
+        .drop-area:hover { border-color: #4CAF50; background: #444; color: #fff; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 12px 30px; font-size: 16px; cursor: pointer; border-radius: 5px; margin-top: 15px; display: none; }
+        .btn:hover { background: #45a049; }
+        #msg { min-height: 20px; font-size: 14px; margin-top: 10px; }
+        .footer { font-size: 12px; color: #777; margin-top: 20px; border-top: 1px solid #555; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>🔓 AB PLC 程序一键解锁</h2>
+    <div class="drop-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        点击选择或拖入 .L5X 文件
+    </div>
+    <input type="file" id="fileInput" accept=".L5X,.l5x" style="display:none">
+    
+    <div id="msg">等待文件...</div>
+    <button id="dlBtn" class="btn">⬇️ 下载无锁版文件</button>
+
+    <div class="footer">
+        纯本地运行 | 不上传服务器 | 直接移除 SourceKey 保护
+    </div>
+</div>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const msg = document.getElementById('msg');
+    const dlBtn = document.getElementById('dlBtn');
+    let processedContent = null, newFileName = "";
+
+    // 拖拽与点击事件处理
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#4CAF50'; });
+    dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = '#666'; });
+    dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.style.borderColor = '#666'; handleFile(e.dataTransfer.files[0]); });
+    fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+    function handleFile(file) {
+        if (!file || !file.name.toLowerCase().endsWith('.l5x')) {
+            msg.innerHTML = "<span style='color:#ff6b6b'>❌ 错误：请上传 .L5X 格式文件</span>";
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            let content = e.target.result;
+            // 核心逻辑：正则查找并替换加密标签
+            const regex = /(SourceKey|SourceProtection)="[^"]*"/gi;
+            
+            if (regex.test(content)) {
+                content = content.replace(regex, ''); // 直接删除锁
+                processedContent = content;
+                newFileName = file.name.replace('.L5X', '').replace('.l5x', '') + '_Unlocked.L5X';
+                
+                msg.innerHTML = "<span style='color:#4CAF50'>✅ 成功！加密锁已移除。</span>";
+                dlBtn.style.display = 'inline-block';
+            } else {
+                msg.innerHTML = "<span style='color:#f1c40f'>⚠️ 文件中未发现加密锁 (可能已解密？)</span>";
+                dlBtn.style.display = 'none';
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    dlBtn.onclick = () => {
+        const blob = new Blob([processedContent], { type: 'text/xml' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = newFileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+</script>
+
+</body>
+</html>
